@@ -102,6 +102,23 @@ tipos_desperdicio ───┘ estado, foto_path  estado_nuevo       anulada, mo
                        es_prueba
 ```
 
+**Relaciones**
+
+| Relación | Tipo | Clave foránea |
+|---|---|---|
+| auth.users → perfiles | 1 a 1 | `perfiles.id` |
+| lugares → reportes | 1 a N | `reportes.lugar_id` |
+| tipos_desperdicio → reportes | 1 a N | `reportes.tipo_id` |
+| perfiles → reportes | 1 a N | `reportes.autor_id` |
+| reportes → reporte_historial | 1 a N | `reporte_historial.reporte_id` |
+| perfiles → reporte_historial | 1 a N | `reporte_historial.usuario_id` |
+| medidores → lecturas | 1 a N | `lecturas.medidor_id` |
+| perfiles → lecturas | 1 a N | `lecturas.cargado_por` |
+| lugares → goteos | 1 a N | `goteos.lugar_id` |
+| perfiles → goteos | 1 a N | `goteos.cargado_por` |
+
+Todas las tablas usan como clave primaria un `id` numérico autoincremental, salvo `perfiles`, que usa el mismo `id` (uuid) de la cuenta de Supabase.
+
 | Tabla | Para qué sirve | Reglas principales |
 |---|---|---|
 | `perfiles` | Datos y rol de cada cuenta | Rol: administrador, socio, docente o mantenimiento. Nace inactivo |
