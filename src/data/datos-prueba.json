@@ -1,0 +1,69 @@
+{
+  "_aviso": "DATOS DE PRUEBA (ficticios). Las fechas se calculan al cargar: 'hace_dias' y 'semanas_atras' cuentan desde hoy.",
+  "perfiles": [
+    { "id": "demo-admin", "nombre": "Leandro Pereyra", "curso_cargo": "Socio fundador", "rol": "administrador", "activo": true },
+    { "id": "demo-socio", "nombre": "Socio de prueba", "curso_cargo": "4° A", "rol": "socio", "activo": true },
+    { "id": "demo-mant", "nombre": "Mantenimiento de prueba", "curso_cargo": "Maestranza", "rol": "mantenimiento", "activo": true },
+    { "id": "demo-docente", "nombre": "Docente de prueba", "curso_cargo": "Comisión asesora", "rol": "docente", "activo": true },
+    { "id": "demo-nuevo", "nombre": "Estudiante nuevo", "curso_cargo": "3° B", "rol": "socio", "activo": false }
+  ],
+  "lugares": [
+    { "id": 1, "nombre": "Aula 1", "sector": "aula" },
+    { "id": 2, "nombre": "Aula 2", "sector": "aula" },
+    { "id": 3, "nombre": "Aula 3", "sector": "aula" },
+    { "id": 4, "nombre": "Aula 4", "sector": "aula" },
+    { "id": 5, "nombre": "Aula 5", "sector": "aula" },
+    { "id": 6, "nombre": "Baño planta baja", "sector": "baño" },
+    { "id": 7, "nombre": "Baño 1° piso", "sector": "baño" },
+    { "id": 8, "nombre": "Baño 2° piso", "sector": "baño" },
+    { "id": 9, "nombre": "Laboratorio", "sector": "laboratorio" },
+    { "id": 10, "nombre": "Sala de informática", "sector": "laboratorio" },
+    { "id": 11, "nombre": "Cocina", "sector": "cocina" },
+    { "id": 12, "nombre": "Patio", "sector": "patio" },
+    { "id": 13, "nombre": "Sala de profesores", "sector": "oficina" },
+    { "id": 14, "nombre": "Dirección", "sector": "oficina" }
+  ],
+  "tipos": [
+    { "id": 1, "nombre": "Canilla que gotea", "recurso": "agua" },
+    { "id": 2, "nombre": "Canilla abierta", "recurso": "agua" },
+    { "id": 3, "nombre": "Mochila de inodoro que pierde", "recurso": "agua" },
+    { "id": 4, "nombre": "Pérdida en cañería", "recurso": "agua" },
+    { "id": 5, "nombre": "Luces encendidas sin uso", "recurso": "luz" },
+    { "id": 6, "nombre": "Ventilador encendido sin uso", "recurso": "luz" },
+    { "id": 7, "nombre": "Aire acondicionado encendido sin uso", "recurso": "luz" },
+    { "id": 8, "nombre": "Computadora o proyector encendido sin uso", "recurso": "luz" }
+  ],
+  "medidores": [
+    { "id": 1, "nombre": "Medidor de luz principal", "recurso": "luz", "unidad": "kWh" },
+    { "id": 2, "nombre": "Medidor de agua principal", "recurso": "agua", "unidad": "m3" }
+  ],
+  "reportes": [
+    { "id": 1, "lugar_id": 8, "tipo_id": 1, "descripcion": "Gotea fuerte la canilla de la izquierda", "estado": "pendiente", "autor_id": "demo-admin", "hace_dias": 0.02 },
+    { "id": 2, "lugar_id": 9, "tipo_id": 6, "descripcion": "Quedó prendido después de la última hora", "estado": "en_reparacion", "autor_id": "demo-socio", "hace_dias": 1 },
+    { "id": 3, "lugar_id": 5, "tipo_id": 5, "descripcion": "Todas las luces prendidas en el recreo", "estado": "resuelto", "autor_id": "demo-socio", "hace_dias": 2 },
+    { "id": 4, "lugar_id": 11, "tipo_id": 3, "descripcion": null, "estado": "pendiente", "autor_id": "demo-socio", "hace_dias": 3 },
+    { "id": 5, "lugar_id": 2, "tipo_id": 5, "descripcion": null, "estado": "resuelto", "autor_id": "demo-admin", "hace_dias": 4 },
+    { "id": 6, "lugar_id": 6, "tipo_id": 2, "descripcion": "La encontramos abierta al final del turno", "estado": "resuelto", "autor_id": "demo-socio", "hace_dias": 5 },
+    { "id": 7, "lugar_id": 10, "tipo_id": 8, "descripcion": "Proyector encendido toda la tarde", "estado": "en_reparacion", "autor_id": "demo-admin", "hace_dias": 6 },
+    { "id": 8, "lugar_id": 12, "tipo_id": 4, "descripcion": "Charco permanente cerca del bebedero", "estado": "pendiente", "autor_id": "demo-socio", "hace_dias": 8 },
+    { "id": 9, "lugar_id": 3, "tipo_id": 7, "descripcion": null, "estado": "anulado", "motivo_anulacion": "Reporte duplicado", "autor_id": "demo-socio", "hace_dias": 9 },
+    { "id": 10, "lugar_id": 7, "tipo_id": 1, "descripcion": null, "estado": "resuelto", "autor_id": "demo-admin", "hace_dias": 12 }
+  ],
+  "lecturas": [
+    { "id": 1, "medidor_id": 1, "valor": 16667, "semanas_atras": 4 },
+    { "id": 2, "medidor_id": 1, "valor": 17137, "semanas_atras": 3 },
+    { "id": 3, "medidor_id": 1, "valor": 17592, "semanas_atras": 2 },
+    { "id": 4, "medidor_id": 1, "valor": 18040, "semanas_atras": 1 },
+    { "id": 5, "medidor_id": 1, "valor": 18452, "semanas_atras": 0 },
+    { "id": 6, "medidor_id": 2, "valor": 1203.4, "semanas_atras": 4 },
+    { "id": 7, "medidor_id": 2, "valor": 1213.5, "semanas_atras": 3 },
+    { "id": 8, "medidor_id": 2, "valor": 1223.4, "semanas_atras": 2 },
+    { "id": 9, "medidor_id": 2, "valor": 1233.3, "semanas_atras": 1 },
+    { "id": 10, "medidor_id": 2, "valor": 1242.9, "semanas_atras": 0 }
+  ],
+  "goteos": [
+    { "id": 1, "lugar_id": 8, "canilla": "Izquierda", "ml_10min": 9.5, "hace_dias": 1 },
+    { "id": 2, "lugar_id": 7, "canilla": "Central", "ml_10min": 6, "hace_dias": 12 },
+    { "id": 3, "lugar_id": 11, "canilla": "Pileta", "ml_10min": 14, "hace_dias": 3 }
+  ]
+}
