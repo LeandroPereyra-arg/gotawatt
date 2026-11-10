@@ -16,6 +16,7 @@ const enlaces = computed(() =>
     { a: '/reportes', texto: 'Reportes', icono: 'reportes' },
     { a: '/mediciones', texto: 'Mediciones', icono: 'medir' },
     { a: '/estadisticas', texto: 'Estadísticas', icono: 'datos' },
+    { a: '/catalogos', texto: 'Catálogos', icono: 'catalogo', permiso: 'gestionarCatalogos' },
     { a: '/usuarios', texto: 'Usuarios', icono: 'usuarios', permiso: 'gestionarUsuarios' }
   ].filter((e) => !e.permiso || puede(e.permiso))
 )

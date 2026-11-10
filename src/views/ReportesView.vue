@@ -1,37 +1,43 @@
 <script setup>
-import { onMounted, reactive, ref, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '../services/api'
 import { sesion, puede } from '../stores/sesion'
 import { leerPreferencia, guardarPreferencia } from '../stores/preferencias'
+import { useCarga } from '../composables/useCarga'
+import { useTiempoReal } from '../composables/useTiempoReal'
 import { ESTADOS } from '../utils/reglas'
 import EstadoCarga from '../components/EstadoCarga.vue'
 import TarjetaReporte from '../components/TarjetaReporte.vue'
 import IconoSimple from '../components/IconoSimple.vue'
 
 const ruta = useRoute()
-const vacios = { texto: '', estado: '', lugarId: '', recurso: '', soloMios: false }
+const vacios = { texto: '', estado: '', lugarId: '', recurso: '', soloMios: false, orden: 'recientes' }
+const ORDENES = {
+  recientes: 'Más recientes primero',
+  antiguos: 'Más antiguos primero',
+  actualizados: 'Últimos actualizados',
+  lugar: 'Lugar (A a Z)'
+}
 
 // Los filtros se recuerdan en este dispositivo
+// Si se llega desde un enlace (por ejemplo, desde Estadísticas) se aplican solo esos filtros
 const filtros = reactive(leerPreferencia('filtros-reportes', vacios))
-if (ruta.query.estado) filtros.estado = ruta.query.estado
+if (ruta.query.estado || ruta.query.lugar) {
+  Object.assign(filtros, { ...vacios, orden: filtros.orden })
+  if (ruta.query.estado) filtros.estado = String(ruta.query.estado)
+  if (ruta.query.lugar) filtros.lugarId = Number(ruta.query.lugar)
+}
 
 const reportes = ref([])
-const cargando = ref(true)
-const error = ref('')
 let espera = null
 
-async function cargar() {
-  cargando.value = true
-  error.value = ''
-  try {
-    reportes.value = await api.listarReportes({ ...filtros, usuarioId: sesion.usuario.id })
-  } catch (e) {
-    error.value = e.message
-  } finally {
-    cargando.value = false
-  }
-}
+const { cargando, error, cargar } = useCarga(async () => {
+  reportes.value = await api.listarReportes({ ...filtros, usuarioId: sesion.usuario.id })
+})
+cargar()
+// Si otro usuario crea o cambia un reporte, la lista se actualiza sola
+useTiempoReal(['reportes'], () => cargar({ silencioso: true }))
 
 watch(
   filtros,
@@ -42,7 +48,6 @@ watch(
   },
   { deep: true }
 )
-onMounted(cargar)
 
 function limpiar() {
   Object.assign(filtros, { ...vacios })
@@ -86,6 +91,12 @@ function limpiar() {
         <option value="">Agua y luz</option>
         <option value="agua">Agua</option>
         <option value="luz">Luz</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label for="f-orden">Ordenar por</label>
+      <select id="f-orden" v-model="filtros.orden">
+        <option v-for="(nombre, clave) in ORDENES" :key="clave" :value="clave">{{ nombre }}</option>
       </select>
     </div>
     <div class="fila pie-filtros">

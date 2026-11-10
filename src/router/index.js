@@ -13,6 +13,7 @@ const routes = [
   { path: '/reportes/:id/editar', name: 'editar-reporte', component: () => import('../views/ReporteFormView.vue'), props: true, meta: { titulo: 'Editar reporte' } },
   { path: '/mediciones', name: 'mediciones', component: () => import('../views/MedicionesView.vue'), meta: { titulo: 'Mediciones' } },
   { path: '/estadisticas', name: 'estadisticas', component: () => import('../views/EstadisticasView.vue'), meta: { titulo: 'Estadísticas' } },
+  { path: '/catalogos', name: 'catalogos', component: () => import('../views/CatalogosView.vue'), meta: { titulo: 'Catálogos', permiso: 'gestionarCatalogos' } },
   { path: '/usuarios', name: 'usuarios', component: () => import('../views/UsuariosView.vue'), meta: { titulo: 'Usuarios', permiso: 'gestionarUsuarios' } },
   { path: '/:ruta(.*)*', name: 'no-encontrado', component: () => import('../views/NoEncontradoView.vue'), meta: { publica: true } }
 ]

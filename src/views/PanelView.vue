@@ -1,32 +1,25 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { api } from '../services/api'
 import { sesion, puede } from '../stores/sesion'
+import { useCarga } from '../composables/useCarga'
+import { useTiempoReal } from '../composables/useTiempoReal'
 import { ultimoConsumo } from '../utils/estadisticas'
 import { formatoNumero, m3ALitros } from '../utils/formato'
 import EstadoCarga from '../components/EstadoCarga.vue'
 import TarjetaReporte from '../components/TarjetaReporte.vue'
 import IconoSimple from '../components/IconoSimple.vue'
 
-const cargando = ref(true)
-const error = ref('')
 const reportes = ref([])
 const lecturas = ref([])
 
-async function cargar() {
-  cargando.value = true
-  error.value = ''
-  try {
-    const [r, l] = await Promise.all([api.listarReportes(), api.listarLecturas()])
-    reportes.value = r
-    lecturas.value = l
-  } catch (e) {
-    error.value = e.message
-  } finally {
-    cargando.value = false
-  }
-}
-onMounted(cargar)
+const { cargando, error, cargar } = useCarga(async () => {
+  const [r, l] = await Promise.all([api.listarReportes(), api.listarLecturas()])
+  reportes.value = r
+  lecturas.value = l
+})
+cargar()
+useTiempoReal(['reportes', 'lecturas'], () => cargar({ silencioso: true }))
 
 const medidor = (recurso) => sesion.catalogos.medidores.find((m) => m.recurso === recurso)
 const luz = computed(() => (medidor('luz') ? ultimoConsumo(lecturas.value, medidor('luz').id) : {}))
@@ -84,6 +77,9 @@ const claseVariacion = (v) => (v === null || v === undefined ? 'texto-gris' : v 
       </RouterLink>
       <RouterLink v-if="sesion.perfil.rol === 'mantenimiento'" :to="{ path: '/reportes', query: { estado: 'abiertos' } }" class="boton">
         Ver reportes para reparar
+      </RouterLink>
+      <RouterLink v-if="puede('gestionarCatalogos')" to="/catalogos" class="boton secundario">
+        <IconoSimple nombre="catalogo" :tam="20" /> Lugares y medidores
       </RouterLink>
       <RouterLink v-if="sesion.perfil.rol === 'docente'" to="/estadisticas" class="boton">
         <IconoSimple nombre="datos" :tam="20" /> Ver estadísticas

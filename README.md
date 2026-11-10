@@ -8,7 +8,7 @@ Hecho con **Vue 3 + Vite**, **Vue Router** y **Supabase** (base de datos Postgre
 
 ---
 
-## Funciones de la primera versión
+## Funciones
 
 | Función | Administrador | Socio relevador | Mantenimiento | Docente asesor |
 |---|:---:|:---:|:---:|:---:|
@@ -18,6 +18,7 @@ Hecho con **Vue 3 + Vite**, **Vue Router** y **Supabase** (base de datos Postgre
 | Cambiar estado (en reparación / resuelto) | ✔ | | ✔ | |
 | Cargar lecturas de medidores y goteo | ✔ | ✔ | | |
 | Anular mediciones con error | ✔ | | | |
+| Administrar lugares, tipos y medidores | ✔ | | | |
 | Habilitar cuentas y asignar roles | ✔ | | | |
 | Eliminar registros **de prueba** | ✔ | | | |
 
@@ -49,11 +50,14 @@ Si no hay archivo `.env`, la app arranca en **modo demostración**:
 2. En **SQL Editor** ejecutá, en este orden:
    - `supabase/01_estructura.sql` (tablas, claves, relaciones y reglas)
    - `supabase/02_politicas.sql` (permisos por rol y bucket de fotos)
+   - `supabase/04_reglas_negocio.sql` (reglas de negocio de la versión 2 y actualización automática)
 3. Copiá `.env.example` como `.env` y completá `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`
    (en **Project Settings → API**). **Usá solo la clave pública `anon`.**
 4. Iniciá la app, creá tu cuenta desde **Crear cuenta** y confirmá el correo si Supabase lo pide.
 5. En el SQL Editor ejecutá `supabase/00_primer_administrador.sql` con tu correo para hacerte administrador.
 6. Ejecutá `supabase/03_datos_prueba.sql` para cargar los lugares, tipos, medidores y registros simulados.
+7. Opcional: ejecutá `supabase/05_consultas_prueba.sql` y `supabase/06_pruebas_permisos.sql` para comprobar
+   que la base y los permisos funcionan (el segundo muestra una tabla con el resultado de cada caso).
 
 Los demás usuarios se registran desde la app y el administrador los habilita en **Usuarios**.
 
@@ -68,8 +72,9 @@ Los demás usuarios se registran desde la app y el administrador los habilita en
     ├── main.js              punto de entrada
     ├── App.vue              estructura general (barra, avisos)
     ├── router/              rutas y control de acceso por rol
-    ├── views/               pantallas (ingreso, panel, reportes, mediciones, estadísticas, usuarios)
+    ├── views/               pantallas (ingreso, panel, reportes, mediciones, estadísticas, catálogos, usuarios)
     ├── components/          piezas reutilizables (barra, diálogos, chips, mensajes)
+    ├── composables/         lógica compartida (carga de datos y actualización automática)
     ├── services/            acceso a datos: Supabase o modo demostración
     ├── stores/              sesión, avisos y preferencias
     ├── utils/               reglas por rol, validaciones, formatos y cálculos
@@ -84,7 +89,14 @@ Los demás usuarios se registran desde la app y el administrador los habilita en
 - Los registros reales no se borran: se **anulan** con un motivo y queda el historial.
 - El archivo `.env` no se sube al repositorio. Nunca pongas la clave `service_role` en la app.
 
-Más detalles en [`docs/documentacion.md`](docs/documentacion.md).
+- Si otro usuario modifica algo, las pantallas abiertas se actualizan solas (Supabase Realtime).
+
+## Documentación
+
+- [`docs/documentacion.md`](docs/documentacion.md): funciones, pantallas, roles y operaciones.
+- [`docs/etapa-6-base-de-datos.md`](docs/etapa-6-base-de-datos.md): DER, modelo relacional, normalización, seguridad y conexión con Supabase.
+- [`docs/etapa-7-funcionalidades.md`](docs/etapa-7-funcionalidades.md): estado de los requerimientos, procesos, reglas de negocio y seguimiento.
+- [`docs/pruebas.md`](docs/pruebas.md): pruebas realizadas y errores corregidos.
 
 ## Publicar la app
 

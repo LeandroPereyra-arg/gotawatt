@@ -10,6 +10,9 @@ function revisar({ data, error }, mensaje = 'No se pudo completar la operación.
     if (/Invalid login credentials/i.test(detalle)) detalle = 'Correo o contraseña incorrectos.'
     else if (/Email not confirmed/i.test(detalle)) detalle = 'Tenés que confirmar tu correo antes de ingresar.'
     else if (/User already registered/i.test(detalle)) detalle = 'Ya existe una cuenta con ese correo.'
+    else if (/reportes_abierto_unico/i.test(detalle)) detalle = 'Ya hay un reporte abierto de ese tipo en ese lugar.'
+    else if (/lecturas_una_por_dia/i.test(detalle)) detalle = 'Ya se cargó una lectura de ese medidor hoy. Si estaba mal, el administrador puede anularla.'
+    else if (/duplicate key|unique constraint/i.test(detalle)) detalle = 'Ya existe un registro con ese nombre.'
     else if (/row-level security|permission denied/i.test(detalle)) detalle = 'Tu rol no tiene permiso para esta acción.'
     else if (/Failed to fetch|NetworkError/i.test(detalle)) detalle = 'No hay conexión con el servidor. Revisá tu internet.'
     throw new Error(detalle ? `${mensaje} ${detalle}` : mensaje)
@@ -59,6 +62,17 @@ export function alCambiarSesion(funcion) {
   })
 }
 
+// ---------------- Actualización automática (Realtime) ----------------
+let numeroCanal = 0
+export function escucharCambios(tablas, funcion) {
+  const canal = supabase.channel(`cambios-${++numeroCanal}`)
+  for (const tabla of tablas) {
+    canal.on('postgres_changes', { event: '*', schema: 'public', table: tabla }, funcion)
+  }
+  canal.subscribe()
+  return () => supabase.removeChannel(canal)
+}
+
 // ---------------- Catálogos ----------------
 export async function obtenerCatalogos() {
   const [lugares, tipos, medidores] = await Promise.all([
@@ -73,9 +87,38 @@ export async function obtenerCatalogos() {
   }
 }
 
+// Lugares, tipos y medidores (incluye los dados de baja) para la pantalla Catálogos
+const TABLAS_CATALOGO = ['lugares', 'tipos_desperdicio', 'medidores']
+
+export async function listarCatalogo(tabla) {
+  if (!TABLAS_CATALOGO.includes(tabla)) throw new Error('Catálogo desconocido.')
+  return revisar(await supabase.from(tabla).select('*').order('nombre'), 'No se pudo cargar el catálogo.')
+}
+
+export async function guardarCatalogo(tabla, datos, id = null) {
+  if (!TABLAS_CATALOGO.includes(tabla)) throw new Error('Catálogo desconocido.')
+  const q = id ? supabase.from(tabla).update(datos).eq('id', id) : supabase.from(tabla).insert(datos)
+  const filas = revisar(await q.select(), 'No se pudo guardar.')
+  if (!filas.length) throw new Error('Solo el administrador puede modificar los catálogos.')
+  return filas[0]
+}
+
+export async function cambiarActivoCatalogo(tabla, id, activo) {
+  return guardarCatalogo(tabla, { activo }, id)
+}
+
 // ---------------- Reportes ----------------
-export async function listarReportes({ texto, estado, lugarId, recurso, soloMios, usuarioId } = {}) {
-  let q = supabase.from('reportes_detalle').select('*').order('creado_en', { ascending: false })
+const ORDENES = {
+  recientes: ['creado_en', false],
+  antiguos: ['creado_en', true],
+  actualizados: ['actualizado_en', false],
+  lugar: ['lugar', true]
+}
+
+export async function listarReportes({ texto, estado, lugarId, recurso, soloMios, usuarioId, orden = 'recientes' } = {}) {
+  const [campo, ascendente] = ORDENES[orden] ?? ORDENES.recientes
+  let q = supabase.from('reportes_detalle').select('*').order(campo, { ascending: ascendente })
+  if (campo !== 'creado_en') q = q.order('creado_en', { ascending: false })
   if (estado === 'abiertos') q = q.in('estado', ['pendiente', 'en_reparacion'])
   else if (estado) q = q.eq('estado', estado)
   if (lugarId) q = q.eq('lugar_id', lugarId)
@@ -84,6 +127,20 @@ export async function listarReportes({ texto, estado, lugarId, recurso, soloMios
   const t = limpiar(texto)
   if (t) q = q.or(`lugar.ilike.%${t}%,tipo.ilike.%${t}%,descripcion.ilike.%${t}%,autor.ilike.%${t}%`)
   return revisar(await q, 'No se pudieron cargar los reportes.')
+}
+
+// Devuelve el reporte abierto del mismo lugar y tipo, si existe (para evitar duplicados)
+export async function buscarReporteAbierto({ lugarId, tipoId, excluirId = null }) {
+  let q = supabase
+    .from('reportes')
+    .select('id, estado')
+    .eq('lugar_id', lugarId)
+    .eq('tipo_id', tipoId)
+    .in('estado', ['pendiente', 'en_reparacion'])
+    .limit(1)
+  if (excluirId) q = q.neq('id', excluirId)
+  const filas = revisar(await q, 'No se pudo comprobar si el reporte está repetido.')
+  return filas[0] ?? null
 }
 
 export async function obtenerReporte(id) {
@@ -194,6 +251,14 @@ export async function anularGoteo(id, motivo) {
     'No se pudo anular la medición.'
   )
   if (!filas.length) throw new Error('Solo el administrador puede anular mediciones.')
+}
+
+// Cantidad de reportes por lugar (vista resumen_por_lugar)
+export async function resumenPorLugar() {
+  return revisar(
+    await supabase.from('resumen_por_lugar').select('*').gt('total', 0).order('total', { ascending: false }).limit(5),
+    'No se pudo cargar el resumen por lugar.'
+  )
 }
 
 // ---------------- Usuarios ----------------

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../services/api'
 import { sesion } from '../stores/sesion'
@@ -48,6 +48,25 @@ async function cargar() {
 }
 onMounted(cargar)
 
+// Regla de negocio: no puede haber dos reportes abiertos del mismo tipo en el mismo lugar.
+// Se avisa apenas se eligen el lugar y el tipo (la base de datos también lo impide).
+const repetido = ref(null)
+let consulta = 0
+watch(
+  () => [form.lugarId, form.tipoId],
+  async ([lugarId, tipoId]) => {
+    repetido.value = null
+    if (!lugarId || !tipoId) return
+    const numero = ++consulta
+    try {
+      const r = await api.buscarReporteAbierto({ lugarId, tipoId, excluirId: props.id })
+      if (numero === consulta) repetido.value = r
+    } catch (e) {
+      console.error(e)
+    }
+  }
+)
+
 function elegirFoto(evento) {
   const archivo = evento.target.files[0] ?? null
   form.foto = archivo
@@ -66,7 +85,7 @@ onBeforeUnmount(() => vistaPrevia.value && URL.revokeObjectURL(vistaPrevia.value
 async function enviar() {
   errorGeneral.value = ''
   errores.value = validarReporte(form)
-  if (hayErrores(errores.value)) return
+  if (hayErrores(errores.value) || repetido.value) return
   procesando.value = true
   try {
     if (editando.value) {
@@ -116,6 +135,11 @@ async function enviar() {
         </select>
       </CampoFormulario>
 
+      <div v-if="repetido" class="aviso-repetido" role="alert">
+        Ya hay un reporte {{ repetido.estado === 'pendiente' ? 'pendiente' : 'en reparación' }} de este tipo en este lugar.
+        <RouterLink :to="`/reportes/${repetido.id}`">Ver reporte n.º {{ repetido.id }}</RouterLink>
+      </div>
+
       <CampoFormulario etiqueta="Foto" para="foto" :error="errores.foto" ayuda="Opcional. JPG, PNG o WEBP. Que no se vean personas.">
         <label class="zona-foto" for="foto">
           <img v-if="vistaPrevia || fotoActual" :src="vistaPrevia || fotoActual" alt="Vista previa de la foto" />
@@ -132,7 +156,7 @@ async function enviar() {
       <p v-if="!editando" class="texto-gris">La fecha, la hora y tu nombre se guardan automáticamente.</p>
       <p v-if="errorGeneral" class="texto-rojo" role="alert">{{ errorGeneral }}</p>
 
-      <button class="boton verde ancho" type="submit" :disabled="procesando">
+      <button class="boton verde ancho" type="submit" :disabled="procesando || Boolean(repetido)">
         {{ procesando ? 'Guardando…' : editando ? 'Guardar cambios' : 'Enviar reporte' }}
       </button>
     </form>
@@ -160,4 +184,13 @@ async function enviar() {
 .zona-foto img { max-width: 100%; max-height: 260px; display: block; }
 .oculto { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .quitar { align-self: flex-start; }
+.aviso-repetido {
+  background: var(--amarillo-claro);
+  color: var(--amarillo);
+  border: 1px solid #f0d79a;
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
 </style>

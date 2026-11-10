@@ -1,4 +1,4 @@
-# GotaWatt · Documentación del sistema (versión 1)
+# GotaWatt · Documentación del sistema
 
 ## 1. Funciones indispensables de la primera versión
 
@@ -27,6 +27,7 @@ A partir de las pantallas y las historias de usuario se eligieron las funciones 
 | Detalle e historial | `/reportes/:id` | Todos (acciones según el rol) |
 | Mediciones | `/mediciones` | Todos (cargar: administrador y socios) |
 | Estadísticas | `/estadisticas` | Todos |
+| Catálogos (lugares, tipos, medidores) | `/catalogos` | Solo administrador |
 | Usuarios | `/usuarios` | Solo administrador |
 
 **Recorrido principal:** Ingreso → Panel → «Nuevo reporte» → completar lugar, tipo y foto → «Enviar reporte» (queda *Pendiente*) → Mantenimiento lo abre desde «Para reparar» → «Marcar en reparación» → «Marcar resuelto» → el caso aparece en Estadísticas.
@@ -35,7 +36,7 @@ A partir de las pantallas y las historias de usuario se eligieron las funciones 
 
 | Rol | Puede |
 |---|---|
-| Administrador | Todo: reportes, mediciones, anular registros, habilitar cuentas y asignar roles, eliminar datos de prueba |
+| Administrador | Todo: reportes, mediciones, anular registros, administrar catálogos, habilitar cuentas y asignar roles, eliminar datos de prueba |
 | Socio relevador | Crear reportes, editar o anular sus reportes pendientes, cargar lecturas y goteos |
 | Mantenimiento | Ver reportes y cambiarlos a «En reparación» o «Resuelto» |
 | Docente asesor | Consultar todo, sin modificar nada |
@@ -51,13 +52,14 @@ A partir de las pantallas y las historias de usuario se eligieron las funciones 
 | Lectura de medidor | Formulario (no puede ser menor a la anterior) | Tabla con consumo calculado | Solo el administrador | **Anular** con motivo |
 | Goteo | Formulario con cálculo de litros por día | Tabla | Solo el administrador | **Anular** con motivo |
 | Usuario | Registro desde la app | Pantalla Usuarios | Rol y habilitación (administrador) | **Deshabilitar** (no se borra) |
+| Lugar, tipo y medidor | Pantalla Catálogos | Pantalla Catálogos | Nombre, sector o recurso (administrador) | **Dar de baja** (no se borra, se puede reactivar) |
 | Datos de prueba | Script SQL o datos de demostración | Etiqueta «Prueba» | Igual que los reales | **Eliminar** (solo el administrador) |
 
 Se eligió **anular en vez de borrar** porque los datos sirven para comparar el consumo antes y después de las medidas: si se borraran se perdería el historial y no se podría saber quién hizo cada cambio.
 
 **Estados de un reporte:** Pendiente → En reparación → Resuelto. Desde Pendiente o En reparación también puede pasar a Anulado. Solo el administrador puede reabrir un reporte resuelto.
 
-**Búsquedas y filtros:** texto (lugar, tipo, descripción o autor), estado (incluye «abiertos»), lugar, recurso (agua o luz) y «solo mis reportes». En Mediciones se puede mostrar u ocultar lo anulado.
+**Búsquedas y filtros:** texto (lugar, tipo, descripción o autor), estado (incluye «abiertos»), lugar, recurso (agua o luz), «solo mis reportes» y orden. En Mediciones se filtra por medidor o lugar y se puede mostrar u ocultar lo anulado. En Usuarios se filtra por rol y estado.
 
 ## 5. Qué información se conserva y dónde
 
@@ -137,12 +139,19 @@ Además hay una vista, `reportes_detalle`, que une cada reporte con su lugar, ti
 - Los permisos se aplican **en la base de datos** con Row Level Security (`supabase/02_politicas.sql`). La interfaz además oculta los botones que el rol no puede usar.
 - Un trigger (`controlar_reporte`) verifica qué campos puede cambiar cada rol y que el orden de los estados sea válido.
 - Otro trigger (`controlar_lectura`) impide cargar una lectura menor que la anterior del mismo medidor.
+- `supabase/04_reglas_negocio.sql` agrega: un solo reporte abierto por lugar y tipo, una lectura por medidor y por día, no cargar datos sobre lugares, tipos o medidores dados de baja, y no dar de baja un lugar o tipo con reportes abiertos.
 - Nadie puede borrar registros reales; el administrador solo puede eliminar los marcados como prueba.
 - La app usa únicamente la clave pública `anon`, leída del archivo `.env`, que no se sube al repositorio. La clave `service_role` y las contraseñas nunca van en el código ni en esta documentación.
 - Las fotos se guardan en un bucket privado. Cada usuario solo puede subir a su propia carpeta y no deben mostrarse personas.
 
-Los permisos se probaron con 40 casos (por ejemplo: un socio no puede editar el reporte de otro, mantenimiento no puede anular, un docente no puede cargar mediciones y nadie puede cambiarse el propio rol).
+Los permisos se prueban con `supabase/06_pruebas_permisos.sql`, que simula cada rol en 39 casos (por ejemplo: un socio no puede editar el reporte de otro, mantenimiento no puede anular, un docente no puede cargar mediciones y nadie puede cambiarse el propio rol). Resultados en [pruebas.md](pruebas.md).
 
 ## 9. Mensajes al usuario
 
-Cada operación muestra un mensaje de **carga** («Cargando reportes…», «Guardando…»), de **confirmación** («Reporte enviado», «Lectura guardada») o de **error** con una explicación clara y un botón para reintentar. Las acciones importantes (anular, eliminar, cambiar estado) piden confirmación antes de hacerse.
+Cada operación muestra un mensaje de **carga** («Cargando reportes…», «Guardando…»), de **confirmación** («Reporte enviado», «Lectura guardada») o de **error** con una explicación clara y un botón para reintentar. Las acciones importantes (anular, eliminar, cambiar estado, dar de baja, cambiar roles, habilitar o deshabilitar cuentas) piden confirmación antes de hacerse.
+
+## 10. Más documentación
+
+- [Etapa 6: base de datos e integración con Supabase](etapa-6-base-de-datos.md)
+- [Etapa 7: funcionalidades completas e integración de módulos](etapa-7-funcionalidades.md)
+- [Pruebas](pruebas.md)
