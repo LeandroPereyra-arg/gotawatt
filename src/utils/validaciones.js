@@ -1,5 +1,6 @@
 // Validaciones de formularios. Cada función devuelve un objeto { campo: 'mensaje' }.
 // Si el objeto está vacío, el formulario es válido.
+import { SECTORES } from './reglas'
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 const TIPOS_FOTO = ['image/jpeg', 'image/png', 'image/webp']
@@ -72,6 +73,21 @@ export function validarGoteo({ lugarId, canilla, ml }) {
   if (texto(ml) === '') e.ml = 'Ingresá los mililitros juntados en 10 minutos.'
   else if (Number.isNaN(v)) e.ml = 'Escribí solo números.'
   else if (v <= 0 || v > 5000) e.ml = 'El valor debe estar entre 0,1 y 5000 ml.'
+  return e
+}
+
+// Lugar, tipo de desperdicio o medidor. "existentes" sirve para evitar nombres repetidos.
+export function validarCatalogo(tabla, { nombre, sector, recurso }, existentes = [], idActual = null) {
+  const e = {}
+  const n = texto(nombre)
+  const minimo = tabla === 'lugares' ? 2 : 3
+  if (!n) e.nombre = 'Ingresá el nombre.'
+  else if (n.length < minimo || n.length > 60) e.nombre = `El nombre debe tener entre ${minimo} y 60 caracteres.`
+  else if (existentes.some((x) => x.id !== idActual && x.nombre.trim().toLowerCase() === n.toLowerCase())) {
+    e.nombre = 'Ya existe uno con ese nombre.'
+  }
+  if (tabla === 'lugares' && !SECTORES.includes(sector)) e.sector = 'Elegí el sector.'
+  if (tabla !== 'lugares' && !['agua', 'luz'].includes(recurso)) e.recurso = 'Elegí si es de agua o de luz.'
   return e
 }
 

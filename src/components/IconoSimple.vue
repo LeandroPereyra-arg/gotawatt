@@ -12,6 +12,7 @@ const trazos = {
   mas: 'M12 5v14M5 12h14',
   atras: 'M15 18l-6-6 6-6',
   buscar: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-5-5',
+  catalogo: 'M4 6h16M4 12h16M4 18h10',
   foto: 'M4 7h3l2-3h6l2 3h3v13H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'
 }
 </script>

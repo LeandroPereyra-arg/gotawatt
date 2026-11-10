@@ -1,9 +1,11 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../services/api'
 import { sesion, puede } from '../stores/sesion'
 import { avisar, avisarError } from '../stores/avisos'
+import { useCarga } from '../composables/useCarga'
+import { useTiempoReal } from '../composables/useTiempoReal'
 import { ESTADOS, estadosSiguientes, puedeEditarReporte } from '../utils/reglas'
 import { formatoFechaHora } from '../utils/formato'
 import ChipEstado from '../components/ChipEstado.vue'
@@ -16,25 +18,23 @@ const router = useRouter()
 
 const reporte = ref(null)
 const foto = ref(null)
-const cargando = ref(true)
-const error = ref('')
 const dialogo = ref(null) // { estado } o { eliminar: true }
 const procesando = ref(false)
 
-async function cargar() {
-  cargando.value = true
-  error.value = ''
-  try {
-    reporte.value = await api.obtenerReporte(props.id)
-    if (!reporte.value) throw new Error('El reporte no existe o no tenés permiso para verlo.')
-    foto.value = await api.urlFoto(reporte.value.foto_path)
-  } catch (e) {
-    error.value = e.message
-  } finally {
-    cargando.value = false
+const { cargando, error, cargar } = useCarga(async () => {
+  const datos = await api.obtenerReporte(props.id)
+  if (!datos) {
+    reporte.value = null
+    throw new Error('El reporte no existe o no tenés permiso para verlo.')
   }
-}
-onMounted(cargar)
+  if (datos.foto_path !== reporte.value?.foto_path) foto.value = await api.urlFoto(datos.foto_path)
+  reporte.value = datos
+})
+cargar()
+// Si otro usuario cambia el estado (por ejemplo, mantenimiento), se ve al instante
+useTiempoReal(['reportes', 'reporte_historial'], () => {
+  if (!dialogo.value) cargar({ silencioso: true })
+})
 
 const siguientes = computed(() => estadosSiguientes(sesion.perfil, reporte.value))
 const editable = computed(() => puedeEditarReporte(sesion.perfil, reporte.value))

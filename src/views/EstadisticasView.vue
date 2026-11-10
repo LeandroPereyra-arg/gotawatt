@@ -1,33 +1,28 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { api } from '../services/api'
 import { sesion } from '../stores/sesion'
+import { useCarga } from '../composables/useCarga'
+import { useTiempoReal } from '../composables/useTiempoReal'
 import { consumosPorPeriodo, contarPor } from '../utils/estadisticas'
 import { formatoFecha, formatoNumero, m3ALitros } from '../utils/formato'
 import { ESTADOS } from '../utils/reglas'
 import EstadoCarga from '../components/EstadoCarga.vue'
 
-const cargando = ref(true)
-const error = ref('')
 const lecturas = ref([])
 const reportes = ref([])
 const goteos = ref([])
+const porLugar = ref([])
 
-async function cargar() {
-  cargando.value = true
-  error.value = ''
-  try {
-    const [l, r, g] = await Promise.all([api.listarLecturas(), api.listarReportes(), api.listarGoteos()])
-    lecturas.value = l
-    reportes.value = r.filter((x) => x.estado !== 'anulado')
-    goteos.value = g
-  } catch (e) {
-    error.value = e.message
-  } finally {
-    cargando.value = false
-  }
-}
-onMounted(cargar)
+const { cargando, error, cargar } = useCarga(async () => {
+  const [l, r, g, p] = await Promise.all([api.listarLecturas(), api.listarReportes(), api.listarGoteos(), api.resumenPorLugar()])
+  lecturas.value = l
+  reportes.value = r.filter((x) => x.estado !== 'anulado')
+  goteos.value = g
+  porLugar.value = p
+})
+cargar()
+useTiempoReal(['reportes', 'lecturas', 'goteos'], () => cargar({ silencioso: true }))
 
 function serie(recurso) {
   const m = sesion.catalogos.medidores.find((x) => x.recurso === recurso)
@@ -120,6 +115,26 @@ const variacionTotal = (lista) => {
             <span>{{ s.cantidad }}</span>
           </li>
         </ul>
+      </section>
+      <section class="tarjeta">
+        <h2>Lugares con más reportes</h2>
+        <div v-if="porLugar.length" class="tabla-contenedor">
+          <table>
+            <thead><tr><th>Lugar</th><th>Pend.</th><th>En rep.</th><th>Resueltos</th><th>Total</th></tr></thead>
+            <tbody>
+              <tr v-for="l in porLugar" :key="l.lugar_id">
+                <td>
+                  <RouterLink :to="{ path: '/reportes', query: { lugar: l.lugar_id } }">{{ l.lugar }}</RouterLink>
+                </td>
+                <td>{{ l.pendientes }}</td>
+                <td>{{ l.en_reparacion }}</td>
+                <td>{{ l.resueltos }}</td>
+                <td><strong>{{ l.total }}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-else class="vacio">Todavía no hay reportes.</p>
       </section>
       <section class="tarjeta">
         <h2>Reportes por estado</h2>

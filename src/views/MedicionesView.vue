@@ -1,41 +1,41 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { api } from '../services/api'
 import { sesion, puede } from '../stores/sesion'
 import { avisar, avisarError } from '../stores/avisos'
 import { leerPreferencia, guardarPreferencia } from '../stores/preferencias'
+import { useCarga } from '../composables/useCarga'
+import { useTiempoReal } from '../composables/useTiempoReal'
 import { validarLectura, validarGoteo, convertirNumero, hayErrores } from '../utils/validaciones'
 import { formatoFechaHora, formatoNumero } from '../utils/formato'
 import CampoFormulario from '../components/CampoFormulario.vue'
 import EstadoCarga from '../components/EstadoCarga.vue'
 import DialogoConfirmar from '../components/DialogoConfirmar.vue'
 
-const pref = leerPreferencia('mediciones', { pestana: 'medidores', verAnuladas: false })
+const pref = leerPreferencia('mediciones', { pestana: 'medidores', verAnuladas: false, medidorId: '', lugarId: '' })
 const pestana = ref(pref.pestana)
 const verAnuladas = ref(pref.verAnuladas)
-watch([pestana, verAnuladas], () => {
-  guardarPreferencia('mediciones', { pestana: pestana.value, verAnuladas: verAnuladas.value })
-  cargar()
+const filtroMedidor = ref(pref.medidorId)
+const filtroLugar = ref(pref.lugarId)
+watch([pestana, verAnuladas, filtroMedidor, filtroLugar], () => {
+  guardarPreferencia('mediciones', {
+    pestana: pestana.value,
+    verAnuladas: verAnuladas.value,
+    medidorId: filtroMedidor.value,
+    lugarId: filtroLugar.value
+  })
 })
+watch([pestana, verAnuladas], () => cargar())
 
 const lecturas = ref([])
 const goteos = ref([])
-const cargando = ref(true)
-const error = ref('')
 
-async function cargar() {
-  cargando.value = true
-  error.value = ''
-  try {
-    if (pestana.value === 'medidores') lecturas.value = await api.listarLecturas({ verAnuladas: verAnuladas.value })
-    else goteos.value = await api.listarGoteos({ verAnuladas: verAnuladas.value })
-  } catch (e) {
-    error.value = e.message
-  } finally {
-    cargando.value = false
-  }
-}
-onMounted(cargar)
+const { cargando, error, cargar } = useCarga(async () => {
+  if (pestana.value === 'medidores') lecturas.value = await api.listarLecturas({ verAnuladas: verAnuladas.value })
+  else goteos.value = await api.listarGoteos({ verAnuladas: verAnuladas.value })
+})
+cargar()
+useTiempoReal(['lecturas', 'goteos'], () => cargar({ silencioso: true }))
 
 const medidores = computed(() => sesion.catalogos.medidores)
 const nombreMedidor = (id) => medidores.value.find((m) => m.id === id)?.nombre ?? ''
@@ -51,6 +51,12 @@ const lecturasConConsumo = computed(() =>
   })
 )
 
+// Filtros de los listados (el consumo se calcula con todas las lecturas antes de filtrar)
+const lecturasFiltradas = computed(() =>
+  lecturasConConsumo.value.filter((l) => !filtroMedidor.value || l.medidor_id === Number(filtroMedidor.value))
+)
+const goteosFiltrados = computed(() => goteos.value.filter((g) => !filtroLugar.value || g.lugar_id === Number(filtroLugar.value)))
+
 // ----- Formulario de lectura -----
 const formLectura = reactive({ medidorId: '', valor: '' })
 const erroresLectura = ref({})
@@ -61,8 +67,16 @@ function ultimaLectura(medidorId) {
   return l.length ? Math.max(...l.map((x) => Number(x.valor))) : null
 }
 
+// Regla: una sola lectura válida por medidor y por día
+const hoy = () => new Date().toDateString()
+const yaHayLecturaHoy = (medidorId) =>
+  lecturas.value.some((x) => x.medidor_id === Number(medidorId) && !x.anulada && new Date(x.fecha_lectura).toDateString() === hoy())
+
 async function guardarLectura() {
   erroresLectura.value = validarLectura(formLectura, formLectura.medidorId ? ultimaLectura(formLectura.medidorId) : null)
+  if (!erroresLectura.value.medidorId && yaHayLecturaHoy(formLectura.medidorId)) {
+    erroresLectura.value.medidorId = 'Ya se cargó una lectura de este medidor hoy. Si estaba mal, el administrador puede anularla.'
+  }
   if (hayErrores(erroresLectura.value)) return
   guardandoLectura.value = true
   try {
@@ -188,13 +202,29 @@ async function confirmarAnulacion(motivo) {
         <h2>{{ pestana === 'medidores' ? 'Lecturas' : 'Mediciones de goteo' }}</h2>
         <label class="casilla"><input v-model="verAnuladas" type="checkbox" /> Ver anuladas</label>
       </div>
+      <div class="campo">
+        <template v-if="pestana === 'medidores'">
+          <label for="f-medidor">Medidor</label>
+          <select id="f-medidor" v-model="filtroMedidor">
+            <option value="">Todos los medidores</option>
+            <option v-for="m in medidores" :key="m.id" :value="m.id">{{ m.nombre }}</option>
+          </select>
+        </template>
+        <template v-else>
+          <label for="f-lugar-goteo">Lugar</label>
+          <select id="f-lugar-goteo" v-model="filtroLugar">
+            <option value="">Todos los lugares</option>
+            <option v-for="l in sesion.catalogos.lugares" :key="l.id" :value="l.id">{{ l.nombre }}</option>
+          </select>
+        </template>
+      </div>
       <EstadoCarga :cargando="cargando" :error="error" @reintentar="cargar" />
 
       <div v-if="!cargando && !error" class="tabla-contenedor">
-        <table v-if="pestana === 'medidores' && lecturasConConsumo.length">
+        <table v-if="pestana === 'medidores' && lecturasFiltradas.length">
           <thead><tr><th>Fecha</th><th>Medidor</th><th>Lectura</th><th>Consumo</th><th></th></tr></thead>
           <tbody>
-            <tr v-for="l in lecturasConConsumo" :key="l.id" :class="{ anulada: l.anulada }">
+            <tr v-for="l in lecturasFiltradas" :key="l.id" :class="{ anulada: l.anulada }">
               <td>{{ formatoFechaHora(l.fecha_lectura) }}<br /><span class="texto-gris">{{ l.cargador }}</span></td>
               <td>{{ nombreMedidor(l.medidor_id) }}</td>
               <td>{{ formatoNumero(l.valor, 1) }} {{ unidad(l.medidor_id) }}</td>
@@ -207,10 +237,10 @@ async function confirmarAnulacion(motivo) {
             </tr>
           </tbody>
         </table>
-        <table v-else-if="pestana === 'goteo' && goteos.length">
+        <table v-else-if="pestana === 'goteo' && goteosFiltrados.length">
           <thead><tr><th>Fecha</th><th>Lugar</th><th>ml/10 min</th><th>Litros por día</th><th></th></tr></thead>
           <tbody>
-            <tr v-for="g in goteos" :key="g.id" :class="{ anulada: g.anulada }">
+            <tr v-for="g in goteosFiltrados" :key="g.id" :class="{ anulada: g.anulada }">
               <td>{{ formatoFechaHora(g.fecha) }}<br /><span class="texto-gris">{{ g.cargador }}</span></td>
               <td>{{ g.lugar }}<br /><span class="texto-gris">{{ g.canilla }}</span></td>
               <td>{{ formatoNumero(g.ml_10min, 1) }}</td>
@@ -223,7 +253,7 @@ async function confirmarAnulacion(motivo) {
             </tr>
           </tbody>
         </table>
-        <p v-else class="vacio">Todavía no hay mediciones cargadas.</p>
+        <p v-else class="vacio">{{ filtroMedidor || filtroLugar ? 'No hay mediciones con ese filtro.' : 'Todavía no hay mediciones cargadas.' }}</p>
       </div>
     </section>
   </div>
@@ -242,21 +272,6 @@ async function confirmarAnulacion(motivo) {
 </template>
 
 <style scoped>
-.pestanas { display: flex; gap: 0.25rem; margin-bottom: 1rem; border-bottom: 2px solid var(--borde); overflow-x: auto; }
-.pestanas button {
-  font: inherit;
-  font-weight: 600;
-  background: none;
-  border: none;
-  padding: 0.7rem 1rem;
-  min-height: 44px;
-  color: var(--gris);
-  cursor: pointer;
-  border-bottom: 3px solid transparent;
-  margin-bottom: -2px;
-  white-space: nowrap;
-}
-.pestanas button.activa { color: var(--azul); border-bottom-color: var(--azul); }
 .columnas > section { min-width: 0; }
 .calculo { background: var(--azul-claro); color: var(--azul-oscuro); font-weight: 700; padding: 0.5rem 0.75rem; border-radius: 8px; }
 @media (min-width: 860px) {

@@ -17,6 +17,15 @@ export const ESTADOS = {
 
 export const SECTORES = ['aula', 'baño', 'laboratorio', 'cocina', 'patio', 'oficina', 'otro']
 
+export const RECURSOS = { agua: 'Agua', luz: 'Luz' }
+
+// Catálogos que administra el administrador
+export const CATALOGOS = {
+  lugares: { titulo: 'Lugares', singular: 'lugar' },
+  tipos_desperdicio: { titulo: 'Tipos de desperdicio', singular: 'tipo de desperdicio' },
+  medidores: { titulo: 'Medidores', singular: 'medidor' }
+}
+
 // Qué puede hacer cada rol
 const PERMISOS = {
   crearReporte: ['administrador', 'socio'],
@@ -24,6 +33,7 @@ const PERMISOS = {
   cargarMedicion: ['administrador', 'socio'],
   corregirMedicion: ['administrador'],
   gestionarUsuarios: ['administrador'],
+  gestionarCatalogos: ['administrador'],
   eliminarPrueba: ['administrador']
 }
 

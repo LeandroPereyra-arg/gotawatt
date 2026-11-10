@@ -73,7 +73,12 @@ function datosIniciales() {
 }
 
 let datos = leer(CLAVE_DATOS) ?? datosIniciales()
-const guardar = () => escribir(CLAVE_DATOS, datos)
+const oyentes = new Set()
+const avisarCambio = () => oyentes.forEach((funcion) => funcion())
+function guardar() {
+  escribir(CLAVE_DATOS, datos)
+  avisarCambio()
+}
 const siguienteId = (lista) => Math.max(0, ...lista.map((x) => x.id)) + 1
 
 export function restablecerDatos() {
@@ -124,10 +129,94 @@ export async function cerrarSesion() {
 
 export function alCambiarSesion() {}
 
+// ---------------- Actualización automática ----------------
+// En este navegador, si otra pestaña modifica los datos, se avisa a las pantallas abiertas.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (evento) => {
+    if (evento.key !== CLAVE_DATOS) return
+    datos = leer(CLAVE_DATOS) ?? datosIniciales()
+    avisarCambio()
+  })
+}
+
+export function escucharCambios(_tablas, funcion) {
+  oyentes.add(funcion)
+  return () => oyentes.delete(funcion)
+}
+
 // ---------------- Catálogos ----------------
+const activo = (x) => x.activo !== false
+const CLAVES_CATALOGO = { lugares: 'lugares', tipos_desperdicio: 'tipos', medidores: 'medidores' }
+const abierto = (r) => ['pendiente', 'en_reparacion'].includes(r.estado)
+
+function listaCatalogo(tabla) {
+  const clave = CLAVES_CATALOGO[tabla]
+  if (!clave) throw new Error('Catálogo desconocido.')
+  return datos[clave]
+}
+
 export async function obtenerCatalogos() {
   await esperar(100)
-  return copia({ lugares: datos.lugares, tipos: datos.tipos, medidores: datos.medidores })
+  return copia({
+    lugares: datos.lugares.filter(activo),
+    tipos: datos.tipos.filter(activo),
+    medidores: datos.medidores.filter(activo)
+  })
+}
+
+export async function listarCatalogo(tabla) {
+  exigir('gestionarCatalogos')
+  await esperar()
+  return copia(
+    listaCatalogo(tabla)
+      .map((x) => ({ ...x, activo: activo(x) }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+  )
+}
+
+export async function guardarCatalogo(tabla, cambios, id = null) {
+  exigir('gestionarCatalogos')
+  const lista = listaCatalogo(tabla)
+  await esperar()
+  if (cambios.nombre !== undefined) {
+    const nombre = cambios.nombre.trim().toLowerCase()
+    if (lista.some((x) => x.id !== id && x.nombre.toLowerCase() === nombre)) {
+      throw new Error('No se pudo guardar. Ya existe un registro con ese nombre.')
+    }
+  }
+  if (cambios.activo === false && tabla !== 'medidores') {
+    const campo = tabla === 'lugares' ? 'lugar_id' : 'tipo_id'
+    const cantidad = datos.reportes.filter((r) => r[campo] === id && abierto(r)).length
+    if (cantidad) throw new Error(`No se pudo guardar. No se puede dar de baja: tiene ${cantidad} reporte(s) abierto(s)`)
+  }
+  let fila
+  if (id) {
+    fila = lista.find((x) => x.id === id)
+    Object.assign(fila, cambios)
+  } else {
+    fila = { id: siguienteId(lista), activo: true, ...cambios }
+    lista.push(fila)
+  }
+  guardar()
+  return copia(fila)
+}
+
+export async function cambiarActivoCatalogo(tabla, id, valor) {
+  return guardarCatalogo(tabla, { activo: valor }, id)
+}
+
+// Mismas reglas que la base de datos: no se carga nada sobre un catálogo dado de baja
+function exigirActivo(lista, id, texto) {
+  const item = lista.find((x) => x.id === Number(id))
+  if (!item || !activo(item)) throw new Error(`${texto} está dado de baja.`)
+}
+
+// No puede haber dos reportes abiertos del mismo tipo en el mismo lugar
+function exigirSinDuplicado(lugarId, tipoId, excluirId = null) {
+  const repetido = datos.reportes.find(
+    (r) => r.id !== excluirId && r.lugar_id === Number(lugarId) && r.tipo_id === Number(tipoId) && abierto(r)
+  )
+  if (repetido) throw new Error(`Ya hay un reporte abierto de ese tipo en ese lugar (n.º ${repetido.id}).`)
 }
 
 // ---------------- Reportes ----------------
@@ -139,7 +228,14 @@ function conNombres(r) {
   return { ...resto, lugar: lugar?.nombre, tipo: tipo?.nombre, recurso: tipo?.recurso, autor: autor?.nombre, foto_path: foto }
 }
 
-export async function listarReportes({ texto, estado, lugarId, recurso, soloMios, usuarioId } = {}) {
+const ORDENES = {
+  recientes: (a, b) => new Date(b.creado_en) - new Date(a.creado_en),
+  antiguos: (a, b) => new Date(a.creado_en) - new Date(b.creado_en),
+  actualizados: (a, b) => new Date(b.actualizado_en) - new Date(a.actualizado_en),
+  lugar: (a, b) => a.lugar.localeCompare(b.lugar, 'es') || new Date(b.creado_en) - new Date(a.creado_en)
+}
+
+export async function listarReportes({ texto, estado, lugarId, recurso, soloMios, usuarioId, orden = 'recientes' } = {}) {
   exigir()
   await esperar()
   const t = String(texto || '').trim().toLowerCase()
@@ -154,7 +250,15 @@ export async function listarReportes({ texto, estado, lugarId, recurso, soloMios
       if (t && ![r.lugar, r.tipo, r.descripcion, r.autor].some((v) => v?.toLowerCase().includes(t))) return false
       return true
     })
-    .sort((a, b) => new Date(b.creado_en) - new Date(a.creado_en))
+    .sort(ORDENES[orden] ?? ORDENES.recientes)
+}
+
+export async function buscarReporteAbierto({ lugarId, tipoId, excluirId = null }) {
+  exigir()
+  const r = datos.reportes.find(
+    (x) => x.id !== Number(excluirId) && x.lugar_id === Number(lugarId) && x.tipo_id === Number(tipoId) && abierto(x)
+  )
+  return r ? { id: r.id, estado: r.estado } : null
 }
 
 export async function obtenerReporte(id) {
@@ -176,6 +280,9 @@ async function prepararFoto(archivo) {
 
 export async function crearReporte({ lugarId, tipoId, descripcion, foto }) {
   const perfil = exigir('crearReporte')
+  exigirActivo(datos.lugares, lugarId, 'El lugar elegido')
+  exigirActivo(datos.tipos, tipoId, 'El tipo de desperdicio elegido')
+  exigirSinDuplicado(lugarId, tipoId)
   const imagen = await prepararFoto(foto)
   await esperar()
   const ahora = new Date().toISOString()
@@ -201,6 +308,9 @@ export async function editarReporte(id, { lugarId, tipoId, descripcion, foto }) 
   const perfil = exigir()
   const r = datos.reportes.find((x) => x.id === Number(id))
   if (!puedeEditarReporte(perfil, r)) throw new Error('No tenés permiso para modificar este reporte.')
+  exigirActivo(datos.lugares, lugarId, 'El lugar elegido')
+  exigirActivo(datos.tipos, tipoId, 'El tipo de desperdicio elegido')
+  exigirSinDuplicado(lugarId, tipoId, r.id)
   const imagen = await prepararFoto(foto)
   await esperar()
   Object.assign(r, { lugar_id: Number(lugarId), tipo_id: Number(tipoId), descripcion: descripcion?.trim() || null, actualizado_en: new Date().toISOString() })
@@ -244,8 +354,20 @@ export async function listarLecturas({ medidorId, verAnuladas } = {}) {
   )
 }
 
+const diaArgentina = (f) => new Date(f).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })
+
 export async function crearLectura({ medidorId, valor }) {
   const perfil = exigir('cargarMedicion')
+  exigirActivo(datos.medidores, medidorId, 'El medidor elegido')
+  const validas = datos.lecturas
+    .filter((l) => l.medidor_id === Number(medidorId) && !l.anulada)
+    .sort((a, b) => new Date(b.fecha_lectura) - new Date(a.fecha_lectura))
+  if (validas[0] && valor < Number(validas[0].valor)) {
+    throw new Error(`Un medidor no retrocede: la lectura anterior fue ${validas[0].valor}.`)
+  }
+  if (validas.some((l) => diaArgentina(l.fecha_lectura) === diaArgentina(Date.now()))) {
+    throw new Error('Ya se cargó una lectura de ese medidor hoy. Si estaba mal, el administrador puede anularla.')
+  }
   await esperar()
   const nueva = {
     id: siguienteId(datos.lecturas),
@@ -281,6 +403,7 @@ export async function listarGoteos({ verAnuladas } = {}) {
 
 export async function crearGoteo({ lugarId, canilla, ml }) {
   const perfil = exigir('cargarMedicion')
+  exigirActivo(datos.lugares, lugarId, 'El lugar elegido')
   await esperar()
   const nuevo = {
     id: siguienteId(datos.goteos),
@@ -303,6 +426,29 @@ export async function anularGoteo(id, motivo) {
   await esperar()
   Object.assign(datos.goteos.find((g) => g.id === id), { anulada: true, motivo_anulacion: motivo.trim() })
   guardar()
+}
+
+// Cantidad de reportes por lugar (equivale a la vista resumen_por_lugar)
+export async function resumenPorLugar() {
+  exigir()
+  await esperar()
+  return datos.lugares
+    .map((l) => {
+      const delLugar = datos.reportes.filter((r) => r.lugar_id === l.id)
+      const contar = (estado) => delLugar.filter((r) => r.estado === estado).length
+      return {
+        lugar_id: l.id,
+        lugar: l.nombre,
+        sector: l.sector,
+        pendientes: contar('pendiente'),
+        en_reparacion: contar('en_reparacion'),
+        resueltos: contar('resuelto'),
+        total: delLugar.filter((r) => r.estado !== 'anulado').length
+      }
+    })
+    .filter((x) => x.total > 0)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5)
 }
 
 // ---------------- Usuarios ----------------

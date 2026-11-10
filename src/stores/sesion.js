@@ -46,6 +46,11 @@ export async function salir() {
   await aplicar(null)
 }
 
+// Se llama después de modificar lugares, tipos o medidores
+export async function recargarCatalogos() {
+  sesion.catalogos = await api.obtenerCatalogos()
+}
+
 export async function recargarPerfil() {
   await aplicar(await api.obtenerSesion())
 }
